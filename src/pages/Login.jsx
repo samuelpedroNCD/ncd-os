@@ -32,6 +32,7 @@ export function Login() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-8 bg-card/50 p-8 rounded-lg backdrop-blur-xl border border-border">
         <div>
+          <div className="text-6xl text-center mb-4">😊</div>
           <h1 className="text-3xl font-bold text-center text-foreground">
             NCD-OS
           </h1>
