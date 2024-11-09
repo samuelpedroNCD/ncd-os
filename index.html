@@ -30,26 +30,5 @@
   <body class="antialiased">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
-    <script>
-  (function() {
-    try {
-      // Default to dark theme
-      let theme = 'dark';
-      
-      // Try to get theme from localStorage
-      const stored = localStorage.getItem('theme-storage');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        theme = parsed.state.theme;
-      }
-      
-      // Apply theme immediately
-      document.documentElement.classList.add(theme);
-    } catch (e) {
-      // Fallback to dark theme
-      document.documentElement.classList.add('dark');
-    }
-  })();
-</script>
   </body>
 </html>
