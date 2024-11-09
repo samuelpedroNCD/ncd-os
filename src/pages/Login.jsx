@@ -30,7 +30,7 @@ export function Login() {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-8 bg-card p-8 rounded-lg border border-border">
+      <div className="w-full max-w-md space-y-8 bg-card/80 backdrop-blur-xl border border-border/50 p-8 rounded-xl shadow-2xl">
         <div>
           <div className="text-6xl text-center mb-4">😊</div>
           <h1 className="text-3xl font-bold text-center text-foreground">
@@ -41,12 +41,12 @@ export function Login() {
         
         <form className="space-y-6" onSubmit={handleSubmit}>
           {error && (
-            <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+            <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
               {error}
             </div>
           )}
           
-          <div>
+          <div className="space-y-2">
             <label htmlFor="email" className="block text-sm font-medium text-foreground">
               Email
             </label>
@@ -56,11 +56,12 @@ export function Login() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="bg-background"
+              className="w-full bg-background/50 border-border/50 focus:border-primary"
+              placeholder="Enter your email"
             />
           </div>
 
-          <div>
+          <div className="space-y-2">
             <label htmlFor="password" className="block text-sm font-medium text-foreground">
               Password
             </label>
@@ -70,13 +71,14 @@ export function Login() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="bg-background"
+              className="w-full bg-background/50 border-border/50 focus:border-primary"
+              placeholder="Enter your password"
             />
           </div>
 
           <Button 
             type="submit" 
-            className="w-full"
+            className="w-full text-base font-medium shadow-lg hover:shadow-xl transition-all"
             disabled={isLoading}
           >
             {isLoading ? 'Signing in...' : 'Sign in'}
