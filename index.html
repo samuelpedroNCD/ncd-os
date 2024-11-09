@@ -8,17 +8,20 @@
     <script>
       (function() {
         try {
-          // Get theme from localStorage or system preference
-          let theme = localStorage.getItem('theme-storage')
-            ? JSON.parse(localStorage.getItem('theme-storage')).state.theme
-            : window.matchMedia('(prefers-color-scheme: dark)').matches
-            ? 'dark'
-            : 'light';
-
-          // Apply theme class to html element immediately
+          // Default to dark theme
+          let theme = 'dark';
+          
+          // Try to get theme from localStorage
+          const stored = localStorage.getItem('theme-storage');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            theme = parsed.state.theme;
+          }
+          
+          // Apply theme immediately
           document.documentElement.classList.add(theme);
         } catch (e) {
-          // Fallback to dark theme if there's an error
+          // Fallback to dark theme
           document.documentElement.classList.add('dark');
         }
       })();
