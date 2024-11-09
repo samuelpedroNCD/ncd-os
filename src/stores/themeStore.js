@@ -2,16 +2,25 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 const getInitialTheme = () => {
+  if (typeof window === 'undefined') return 'dark';
+  
   try {
-    // Check if theme is stored in localStorage
+    // First check localStorage
     const stored = localStorage.getItem('theme-storage');
     if (stored) {
-      return JSON.parse(stored).state.theme;
+      const parsed = JSON.parse(stored);
+      return parsed.state.theme;
     }
-    // Fall back to system preference
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    
+    // Then check system preference
+    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      return 'dark';
+    }
+    
+    // Default to dark theme
+    return 'dark';
   } catch (e) {
-    // Default to dark theme if there's an error
+    // Fallback to dark theme if there's an error
     return 'dark';
   }
 };
