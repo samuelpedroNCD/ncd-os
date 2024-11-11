@@ -5,9 +5,6 @@ drop policy if exists "Enable all actions for authenticated users only" on "publ
 drop policy if exists "Enable all actions for authenticated users only" on "public"."team_members";
 drop policy if exists "Enable all actions for authenticated users only" on "public"."invoices";
 drop policy if exists "Enable all actions for invoice items" on "public"."invoice_items";
-drop policy if exists "Enable read access for authenticated users" on "public"."project_analytics";
-drop policy if exists "Enable read access for authenticated users" on "public"."task_analytics";
-drop policy if exists "Enable read access for authenticated users" on "public"."revenue_analytics";
 
 -- Enable RLS
 alter table if exists "public"."projects" enable row level security;
@@ -49,9 +46,9 @@ create table if not exists "public"."tasks" (
   "description" text,
   "project_id" uuid references public.projects not null,
   "due_date" date,
-  "completion_date" timestamp with time zone,
   "priority" text not null,
   "completed" boolean default false,
+  "completion_date" timestamp with time zone,
   "user_id" uuid references auth.users not null
 );
 
@@ -84,41 +81,6 @@ create table if not exists "public"."invoice_items" (
   "description" text not null,
   "amount" numeric(10,2) not null
 );
-
--- Add analytics views for dashboard
-create or replace view public.project_analytics as
-select
-  user_id,
-  count(*) as total_projects,
-  count(*) filter (where status = 'In Progress') as active_projects,
-  count(*) filter (where status = 'Completed') as completed_projects,
-  avg(completion_percentage) as avg_completion,
-  sum(budget) as total_budget
-from public.projects
-group by user_id;
-
-create or replace view public.task_analytics as
-select
-  user_id,
-  count(*) as total_tasks,
-  count(*) filter (where completed = true) as completed_tasks,
-  count(*) filter (where completed = false and due_date < current_date) as overdue_tasks,
-  avg(case when completed = true and completion_date is not null
-      then extract(epoch from (completion_date - created_at))/86400.0
-      else null end) as avg_completion_days
-from public.tasks
-group by user_id;
-
-create or replace view public.revenue_analytics as
-select
-  user_id,
-  sum(amount) filter (where status = 'Paid') as total_revenue,
-  sum(amount) filter (where status = 'Pending') as pending_revenue,
-  sum(amount) filter (where status = 'Overdue') as overdue_revenue,
-  count(*) filter (where status = 'Paid') as paid_invoices,
-  count(*) filter (where status = 'Pending') as pending_invoices
-from public.invoices
-group by user_id;
 
 -- Add function to calculate project health
 create or replace function public.calculate_project_health(
@@ -213,6 +175,45 @@ create policy "Enable all actions for invoice items" on "public"."invoice_items"
       where id = invoice_id and user_id = auth.uid()
     )
   );
+
+-- Create analytics views
+drop view if exists public.project_analytics;
+drop view if exists public.task_analytics;
+drop view if exists public.revenue_analytics;
+
+create view public.project_analytics as
+select
+  user_id,
+  count(*) as total_projects,
+  count(*) filter (where status = 'In Progress') as active_projects,
+  count(*) filter (where status = 'Completed') as completed_projects,
+  avg(completion_percentage) as avg_completion,
+  sum(budget) as total_budget
+from public.projects
+group by user_id;
+
+create view public.task_analytics as
+select
+  user_id,
+  count(*) as total_tasks,
+  count(*) filter (where completed = true) as completed_tasks,
+  count(*) filter (where completed = false and due_date < current_date) as overdue_tasks,
+  avg(case when completed = true and completion_date is not null
+      then extract(epoch from (completion_date - created_at))/86400.0
+      else null end) as avg_completion_days
+from public.tasks
+group by user_id;
+
+create view public.revenue_analytics as
+select
+  user_id,
+  sum(amount) filter (where status = 'Paid') as total_revenue,
+  sum(amount) filter (where status = 'Pending') as pending_revenue,
+  sum(amount) filter (where status = 'Overdue') as overdue_revenue,
+  count(*) filter (where status = 'Paid') as paid_invoices,
+  count(*) filter (where status = 'Pending') as pending_invoices
+from public.invoices
+group by user_id;
 
 -- Add RLS policies for analytics views
 create policy "Enable read access for authenticated users" on public.project_analytics
