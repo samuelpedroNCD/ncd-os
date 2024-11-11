@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { TopNav } from '../components/TopNav';
 import { Button } from '../components/ui/Button';
@@ -9,23 +9,57 @@ import { useProjectStore } from '../stores/projectStore';
 export function Projects() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
-  const { projects, addProject, updateProject, deleteProject } = useProjectStore();
+  const { projects, loading, error, fetchProjects, addProject, updateProject, deleteProject } = useProjectStore();
 
-  const handleCreateProject = (data) => {
-    addProject(data);
-    setIsCreateModalOpen(false);
-  };
+  useEffect(() => {
+    fetchProjects();
+  }, [fetchProjects]);
 
-  const handleUpdateProject = (data) => {
-    updateProject(editingProject.id, data);
-    setEditingProject(null);
-  };
-
-  const handleDeleteProject = (id) => {
-    if (confirm('Are you sure you want to delete this project?')) {
-      deleteProject(id);
+  const handleCreateProject = async (data) => {
+    const { error } = await addProject(data);
+    if (!error) {
+      setIsCreateModalOpen(false);
     }
   };
+
+  const handleUpdateProject = async (data) => {
+    const { error } = await updateProject(editingProject.id, data);
+    if (!error) {
+      setEditingProject(null);
+    }
+  };
+
+  const handleDeleteProject = async (id) => {
+    if (confirm('Are you sure you want to delete this project?')) {
+      await deleteProject(id);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <TopNav />
+        <main className="pt-24 px-4">
+          <div className="max-w-7xl mx-auto">
+            <p className="text-center text-muted-foreground">Loading...</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background">
+        <TopNav />
+        <main className="pt-24 px-4">
+          <div className="max-w-7xl mx-auto">
+            <p className="text-center text-destructive">Error: {error}</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -72,6 +106,20 @@ export function Projects() {
                     {project.status}
                   </span>
                 </div>
+                {project.completion_percentage > 0 && (
+                  <div className="mt-4">
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className="text-muted-foreground">Progress</span>
+                      <span className="text-primary">{project.completion_percentage}%</span>
+                    </div>
+                    <div className="h-2 bg-muted rounded-full">
+                      <div
+                        className="h-full bg-primary rounded-full transition-all duration-300"
+                        style={{ width: `${project.completion_percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
 
