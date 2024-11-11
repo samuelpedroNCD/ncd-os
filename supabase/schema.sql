@@ -1,3 +1,90 @@
+-- Drop existing policies first
+drop policy if exists "Enable all actions for authenticated users only" on "public"."clients";
+drop policy if exists "Enable all actions for authenticated users only" on "public"."projects";
+drop policy if exists "Enable all actions for authenticated users only" on "public"."tasks";
+drop policy if exists "Enable all actions for authenticated users only" on "public"."team_members";
+drop policy if exists "Enable all actions for authenticated users only" on "public"."invoices";
+drop policy if exists "Enable all actions for invoice items" on "public"."invoice_items";
+drop policy if exists "Enable read access for authenticated users" on "public"."project_analytics";
+drop policy if exists "Enable read access for authenticated users" on "public"."task_analytics";
+drop policy if exists "Enable read access for authenticated users" on "public"."revenue_analytics";
+
+-- Enable RLS
+alter table if exists "public"."projects" enable row level security;
+alter table if exists "public"."tasks" enable row level security;
+alter table if exists "public"."clients" enable row level security;
+alter table if exists "public"."team_members" enable row level security;
+alter table if exists "public"."invoices" enable row level security;
+alter table if exists "public"."invoice_items" enable row level security;
+
+-- Create or update tables
+create table if not exists "public"."clients" (
+  "id" uuid default gen_random_uuid() primary key,
+  "created_at" timestamp with time zone default timezone('utc'::text, now()) not null,
+  "name" text not null,
+  "email" text not null,
+  "company" text,
+  "phone" text,
+  "address" text,
+  "user_id" uuid references auth.users not null
+);
+
+create table if not exists "public"."projects" (
+  "id" uuid default gen_random_uuid() primary key,
+  "created_at" timestamp with time zone default timezone('utc'::text, now()) not null,
+  "name" text not null,
+  "client_id" uuid references public.clients not null,
+  "budget" numeric(10,2),
+  "status" text not null,
+  "start_date" date not null default current_date,
+  "due_date" date,
+  "completion_percentage" integer default 0,
+  "user_id" uuid references auth.users not null
+);
+
+create table if not exists "public"."tasks" (
+  "id" uuid default gen_random_uuid() primary key,
+  "created_at" timestamp with time zone default timezone('utc'::text, now()) not null,
+  "title" text not null,
+  "description" text,
+  "project_id" uuid references public.projects not null,
+  "due_date" date,
+  "completion_date" timestamp with time zone,
+  "priority" text not null,
+  "completed" boolean default false,
+  "user_id" uuid references auth.users not null
+);
+
+create table if not exists "public"."team_members" (
+  "id" uuid default gen_random_uuid() primary key,
+  "created_at" timestamp with time zone default timezone('utc'::text, now()) not null,
+  "name" text not null,
+  "email" text not null,
+  "role" text not null,
+  "skills" text[],
+  "avatar" text,
+  "user_id" uuid references auth.users not null
+);
+
+create table if not exists "public"."invoices" (
+  "id" uuid default gen_random_uuid() primary key,
+  "created_at" timestamp with time zone default timezone('utc'::text, now()) not null,
+  "number" text not null,
+  "client_id" uuid references public.clients not null,
+  "amount" numeric(10,2) not null,
+  "status" text not null,
+  "due_date" date not null,
+  "user_id" uuid references auth.users not null
+);
+
+create table if not exists "public"."invoice_items" (
+  "id" uuid default gen_random_uuid() primary key,
+  "created_at" timestamp with time zone default timezone('utc'::text, now()) not null,
+  "invoice_id" uuid references public.invoices not null,
+  "description" text not null,
+  "amount" numeric(10,2) not null
+);
+
 -- Add analytics views for dashboard
 create or replace view public.project_analytics as
 select
@@ -63,22 +150,6 @@ begin
 end;
 $$ language plpgsql;
 
--- Add RLS policies for analytics views
-create policy "Enable read access for authenticated users" on public.project_analytics
-  for select using (auth.uid() = user_id);
-
-create policy "Enable read access for authenticated users" on public.task_analytics
-  for select using (auth.uid() = user_id);
-
-create policy "Enable read access for authenticated users" on public.revenue_analytics
-  for select using (auth.uid() = user_id);
-
--- Add indexes for analytics performance
-create index if not exists idx_projects_status on public.projects(status);
-create index if not exists idx_tasks_completion on public.tasks(completed, due_date);
-create index if not exists idx_invoices_status on public.invoices(status);
-create index if not exists idx_projects_dates on public.projects(start_date, due_date);
-
 -- Add function to get dashboard summary
 create or replace function public.get_dashboard_summary(p_user_id uuid)
 returns json as $$
@@ -118,3 +189,43 @@ begin
   return result;
 end;
 $$ language plpgsql security definer;
+
+-- Create RLS policies
+create policy "Enable all actions for authenticated users only" on "public"."clients"
+  for all using (auth.uid() = user_id);
+
+create policy "Enable all actions for authenticated users only" on "public"."projects"
+  for all using (auth.uid() = user_id);
+
+create policy "Enable all actions for authenticated users only" on "public"."tasks"
+  for all using (auth.uid() = user_id);
+
+create policy "Enable all actions for authenticated users only" on "public"."team_members"
+  for all using (auth.uid() = user_id);
+
+create policy "Enable all actions for authenticated users only" on "public"."invoices"
+  for all using (auth.uid() = user_id);
+
+create policy "Enable all actions for invoice items" on "public"."invoice_items"
+  for all using (
+    exists (
+      select 1 from public.invoices
+      where id = invoice_id and user_id = auth.uid()
+    )
+  );
+
+-- Add RLS policies for analytics views
+create policy "Enable read access for authenticated users" on public.project_analytics
+  for select using (auth.uid() = user_id);
+
+create policy "Enable read access for authenticated users" on public.task_analytics
+  for select using (auth.uid() = user_id);
+
+create policy "Enable read access for authenticated users" on public.revenue_analytics
+  for select using (auth.uid() = user_id);
+
+-- Add indexes for analytics performance
+create index if not exists idx_projects_status on public.projects(status);
+create index if not exists idx_tasks_completion on public.tasks(completed, due_date);
+create index if not exists idx_invoices_status on public.invoices(status);
+create index if not exists idx_projects_dates on public.projects(start_date, due_date);
