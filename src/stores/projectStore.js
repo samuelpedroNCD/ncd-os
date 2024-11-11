@@ -15,28 +15,40 @@ export const useProjectStore = create((set, get) => ({
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      set({ projects: data, loading: false });
+      set({ projects: data, loading: false, error: null });
     } catch (error) {
       set({ error: error.message, loading: false });
     }
   },
 
-  createProject: async (project) => {
+  addProject: async (project) => {
     set({ loading: true });
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No authenticated user');
+
       const { data, error } = await supabase
         .from('projects')
-        .insert([project])
+        .insert([{
+          ...project,
+          user_id: user.id,
+          completion_percentage: 0,
+          status: project.status || 'In Progress'
+        }])
         .select()
         .single();
 
       if (error) throw error;
+      
       set(state => ({
         projects: [data, ...state.projects],
-        loading: false
+        loading: false,
+        error: null
       }));
+      
       return { data, error: null };
     } catch (error) {
+      console.error('Error adding project:', error);
       set({ error: error.message, loading: false });
       return { data: null, error };
     }
@@ -53,10 +65,15 @@ export const useProjectStore = create((set, get) => ({
         .single();
 
       if (error) throw error;
+      
       set(state => ({
-        projects: state.projects.map(p => p.id === id ? data : p),
-        loading: false
+        projects: state.projects.map(project => 
+          project.id === id ? data : project
+        ),
+        loading: false,
+        error: null
       }));
+      
       return { data, error: null };
     } catch (error) {
       set({ error: error.message, loading: false });
@@ -73,10 +90,13 @@ export const useProjectStore = create((set, get) => ({
         .eq('id', id);
 
       if (error) throw error;
+      
       set(state => ({
-        projects: state.projects.filter(p => p.id !== id),
-        loading: false
+        projects: state.projects.filter(project => project.id !== id),
+        loading: false,
+        error: null
       }));
+      
       return { error: null };
     } catch (error) {
       set({ error: error.message, loading: false });
