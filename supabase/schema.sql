@@ -1,10 +1,13 @@
--- Drop existing policies first
+-- Drop existing policies and views first
 drop policy if exists "Enable all actions for authenticated users only" on "public"."clients";
 drop policy if exists "Enable all actions for authenticated users only" on "public"."projects";
 drop policy if exists "Enable all actions for authenticated users only" on "public"."tasks";
 drop policy if exists "Enable all actions for authenticated users only" on "public"."team_members";
 drop policy if exists "Enable all actions for authenticated users only" on "public"."invoices";
 drop policy if exists "Enable all actions for invoice items" on "public"."invoice_items";
+drop view if exists public.project_analytics;
+drop view if exists public.task_analytics;
+drop view if exists public.revenue_analytics;
 
 -- Enable RLS
 alter table if exists "public"."projects" enable row level security;
@@ -26,18 +29,28 @@ create table if not exists "public"."clients" (
   "user_id" uuid references auth.users not null
 );
 
-create table if not exists "public"."projects" (
-  "id" uuid default gen_random_uuid() primary key,
-  "created_at" timestamp with time zone default timezone('utc'::text, now()) not null,
-  "name" text not null,
-  "client_id" uuid references public.clients not null,
-  "budget" numeric(10,2),
-  "status" text not null,
-  "start_date" date not null default current_date,
-  "due_date" date,
-  "completion_percentage" integer default 0,
-  "user_id" uuid references auth.users not null
-);
+-- Add completion_percentage column to projects if it doesn't exist
+do $$ 
+begin
+  if not exists (select 1 from information_schema.columns 
+    where table_schema = 'public' 
+    and table_name = 'projects' 
+    and column_name = 'completion_percentage') then
+    
+    create table if not exists "public"."projects" (
+      "id" uuid default gen_random_uuid() primary key,
+      "created_at" timestamp with time zone default timezone('utc'::text, now()) not null,
+      "name" text not null,
+      "client_id" uuid references public.clients not null,
+      "budget" numeric(10,2),
+      "status" text not null,
+      "start_date" date not null default current_date,
+      "due_date" date,
+      "completion_percentage" integer default 0,
+      "user_id" uuid references auth.users not null
+    );
+  end if;
+end $$;
 
 create table if not exists "public"."tasks" (
   "id" uuid default gen_random_uuid() primary key,
@@ -177,10 +190,6 @@ create policy "Enable all actions for invoice items" on "public"."invoice_items"
   );
 
 -- Create analytics views
-drop view if exists public.project_analytics;
-drop view if exists public.task_analytics;
-drop view if exists public.revenue_analytics;
-
 create view public.project_analytics as
 select
   user_id,
