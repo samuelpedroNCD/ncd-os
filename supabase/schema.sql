@@ -22,11 +22,12 @@ create table if not exists "public"."projects" (
   "id" uuid default gen_random_uuid() primary key,
   "created_at" timestamp with time zone default timezone('utc'::text, now()) not null,
   "name" text not null,
+  "description" text,
   "client_id" uuid references public.clients,
   "budget" numeric(10,2),
   "status" text not null,
-  "due_date" date,
   "completion_percentage" integer default 0,
+  "due_date" date,
   "user_id" uuid references auth.users not null
 );
 
@@ -72,6 +73,14 @@ create table if not exists "public"."invoice_items" (
   "description" text not null,
   "amount" numeric(10,2) not null
 );
+
+-- Enable RLS
+alter table if exists "public"."projects" enable row level security;
+alter table if exists "public"."tasks" enable row level security;
+alter table if exists "public"."clients" enable row level security;
+alter table if exists "public"."team_members" enable row level security;
+alter table if exists "public"."invoices" enable row level security;
+alter table if exists "public"."invoice_items" enable row level security;
 
 -- Create RLS policies
 create policy "Enable all actions for authenticated users only" on "public"."clients"
