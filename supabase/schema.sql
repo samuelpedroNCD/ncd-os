@@ -3,9 +3,10 @@ drop view if exists public.project_analytics;
 drop view if exists public.task_analytics;
 drop view if exists public.revenue_analytics;
 
--- Add completion_percentage column if it doesn't exist
+-- Add completion_percentage and completion_date columns if they don't exist
 do $$ 
 begin
+  -- Add completion_percentage to projects if it doesn't exist
   if not exists (select 1 from information_schema.columns 
     where table_schema = 'public' 
     and table_name = 'projects' 
@@ -15,6 +16,7 @@ begin
     add column completion_percentage integer default 0;
   end if;
 
+  -- Add start_date to projects if it doesn't exist
   if not exists (select 1 from information_schema.columns 
     where table_schema = 'public' 
     and table_name = 'projects' 
@@ -22,6 +24,16 @@ begin
     
     alter table public.projects 
     add column start_date date not null default current_date;
+  end if;
+
+  -- Add completion_date to tasks if it doesn't exist
+  if not exists (select 1 from information_schema.columns 
+    where table_schema = 'public' 
+    and table_name = 'tasks' 
+    and column_name = 'completion_date') then
+    
+    alter table public.tasks 
+    add column completion_date timestamp with time zone;
   end if;
 end $$;
 
@@ -59,6 +71,13 @@ select
   count(*) filter (where status = 'Pending') as pending_invoices
 from public.invoices
 group by user_id;
+
+-- Enable RLS
+alter table if exists "public"."projects" enable row level security;
+alter table if exists "public"."tasks" enable row level security;
+alter table if exists "public"."clients" enable row level security;
+alter table if exists "public"."team_members" enable row level security;
+alter table if exists "public"."invoices" enable row level security;
 
 -- Add RLS policies for analytics views
 create policy "Enable read access for authenticated users" on public.project_analytics
