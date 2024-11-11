@@ -1,101 +1,133 @@
-import { create } from 'zustand';
-import { supabase } from '../lib/supabase';
+-- First, drop existing tables if they exist
+drop table if exists "public"."invoice_items" cascade;
+drop table if exists "public"."invoices" cascade;
+drop table if exists "public"."tasks" cascade;
+drop table if exists "public"."projects" cascade;
+drop table if exists "public"."clients" cascade;
+drop table if exists "public"."team_members" cascade;
 
-export const useClientStore = create((set, get) => ({
-  clients: [],
-  loading: false,
-  error: null,
+-- Create tables
+create table if not exists "public"."clients" (
+  "id" uuid default gen_random_uuid() primary key,
+  "created_at" timestamp with time zone default timezone('utc'::text, now()) not null,
+  "name" text not null,
+  "email" text not null,
+  "company" text,
+  "phone" text,
+  "address" text,
+  "user_id" uuid references auth.users not null
+);
 
-  fetchClients: async () => {
-    set({ loading: true });
-    try {
-      const { data, error } = await supabase
-        .from('clients')
-        .select('*')
-        .order('created_at', { ascending: false });
+create table if not exists "public"."projects" (
+  "id" uuid default gen_random_uuid() primary key,
+  "created_at" timestamp with time zone default timezone('utc'::text, now()) not null,
+  "name" text not null,
+  "client_id" uuid references public.clients,
+  "budget" numeric(10,2),
+  "status" text not null,
+  "due_date" date,
+  "completion_percentage" integer default 0,
+  "user_id" uuid references auth.users not null
+);
 
-      if (error) throw error;
-      set({ clients: data, loading: false, error: null });
-    } catch (error) {
-      set({ error: error.message, loading: false });
-    }
-  },
+create table if not exists "public"."tasks" (
+  "id" uuid default gen_random_uuid() primary key,
+  "created_at" timestamp with time zone default timezone('utc'::text, now()) not null,
+  "title" text not null,
+  "description" text,
+  "project_id" uuid references public.projects not null,
+  "due_date" date,
+  "priority" text not null,
+  "completed" boolean default false,
+  "completion_date" timestamp with time zone,
+  "user_id" uuid references auth.users not null
+);
 
-  addClient: async (client) => {
-    set({ loading: true });
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No authenticated user');
+create table if not exists "public"."team_members" (
+  "id" uuid default gen_random_uuid() primary key,
+  "created_at" timestamp with time zone default timezone('utc'::text, now()) not null,
+  "name" text not null,
+  "email" text not null,
+  "role" text not null,
+  "skills" text[],
+  "avatar" text,
+  "user_id" uuid references auth.users not null
+);
 
-      const { data, error } = await supabase
-        .from('clients')
-        .insert([{ ...client, user_id: user.id }])
-        .select()
-        .single();
+create table if not exists "public"."invoices" (
+  "id" uuid default gen_random_uuid() primary key,
+  "created_at" timestamp with time zone default timezone('utc'::text, now()) not null,
+  "number" text not null,
+  "client_id" uuid references public.clients not null,
+  "amount" numeric(10,2) not null,
+  "status" text not null,
+  "due_date" date not null,
+  "user_id" uuid references auth.users not null
+);
 
-      if (error) throw error;
-      
-      set(state => ({
-        clients: [data, ...state.clients],
-        loading: false,
-        error: null
-      }));
-      
-      return { data, error: null };
-    } catch (error) {
-      console.error('Error adding client:', error);
-      set({ error: error.message, loading: false });
-      return { data: null, error };
-    }
-  },
+create table if not exists "public"."invoice_items" (
+  "id" uuid default gen_random_uuid() primary key,
+  "created_at" timestamp with time zone default timezone('utc'::text, now()) not null,
+  "invoice_id" uuid references public.invoices not null,
+  "description" text not null,
+  "amount" numeric(10,2) not null
+);
 
-  updateClient: async (id, updates) => {
-    set({ loading: true });
-    try {
-      const { data, error } = await supabase
-        .from('clients')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
+-- Create RLS policies
+create policy "Enable all actions for authenticated users only" on "public"."clients"
+  for all using (auth.uid() = user_id);
 
-      if (error) throw error;
-      
-      set(state => ({
-        clients: state.clients.map(client => 
-          client.id === id ? data : client
-        ),
-        loading: false,
-        error: null
-      }));
-      
-      return { data, error: null };
-    } catch (error) {
-      set({ error: error.message, loading: false });
-      return { data: null, error };
-    }
-  },
+create policy "Enable all actions for authenticated users only" on "public"."projects"
+  for all using (auth.uid() = user_id);
 
-  deleteClient: async (id) => {
-    set({ loading: true });
-    try {
-      const { error } = await supabase
-        .from('clients')
-        .delete()
-        .eq('id', id);
+create policy "Enable all actions for authenticated users only" on "public"."tasks"
+  for all using (auth.uid() = user_id);
 
-      if (error) throw error;
-      
-      set(state => ({
-        clients: state.clients.filter(client => client.id !== id),
-        loading: false,
-        error: null
-      }));
-      
-      return { error: null };
-    } catch (error) {
-      set({ error: error.message, loading: false });
-      return { error };
-    }
-  }
-}));
+create policy "Enable all actions for authenticated users only" on "public"."team_members"
+  for all using (auth.uid() = user_id);
+
+create policy "Enable all actions for authenticated users only" on "public"."invoices"
+  for all using (auth.uid() = user_id);
+
+create policy "Enable all actions for invoice items" on "public"."invoice_items"
+  for all using (
+    exists (
+      select 1 from public.invoices
+      where id = invoice_id and user_id = auth.uid()
+    )
+  );
+
+-- Create analytics views
+create or replace view public.project_analytics as
+select
+  user_id,
+  count(*) as total_projects,
+  count(*) filter (where status = 'In Progress') as active_projects,
+  count(*) filter (where status = 'Completed') as completed_projects,
+  avg(completion_percentage) as avg_completion,
+  sum(budget) as total_budget
+from public.projects
+group by user_id;
+
+create or replace view public.task_analytics as
+select
+  user_id,
+  count(*) as total_tasks,
+  count(*) filter (where completed = true) as completed_tasks,
+  count(*) filter (where completed = false and due_date < current_date) as overdue_tasks,
+  avg(case when completed = true and completion_date is not null
+      then extract(epoch from (completion_date - created_at))/86400.0
+      else null end) as avg_completion_days
+from public.tasks
+group by user_id;
+
+create or replace view public.revenue_analytics as
+select
+  user_id,
+  sum(amount) filter (where status = 'Paid') as total_revenue,
+  sum(amount) filter (where status = 'Pending') as pending_revenue,
+  sum(amount) filter (where status = 'Overdue') as overdue_revenue,
+  count(*) filter (where status = 'Paid') as paid_invoices,
+  count(*) filter (where status = 'Pending') as pending_invoices
+from public.invoices
+group by user_id;
