@@ -22,11 +22,24 @@ export function TeamMemberForm({ onSubmit, initialData }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSubmit({
+    
+    // Clean up the data before submission
+    const cleanedData = {
       ...formData,
       skills: formData.skills.split(',').map(skill => skill.trim()).filter(Boolean),
-      hourly_rate: parseFloat(formData.hourly_rate) || 0
-    });
+      hourly_rate: parseFloat(formData.hourly_rate) || null,
+      // Only include start_date if it's not empty
+      ...(formData.start_date ? { start_date: formData.start_date } : {}),
+      // Clean up empty strings
+      ...(formData.phone ? { phone: formData.phone } : {}),
+      ...(formData.github ? { github: formData.github } : {}),
+      ...(formData.linkedin ? { linkedin: formData.linkedin } : {}),
+      ...(formData.avatar ? { avatar: formData.avatar } : {}),
+      ...(formData.bio ? { bio: formData.bio } : {}),
+      ...(formData.department ? { department: formData.department } : {})
+    };
+
+    onSubmit(cleanedData);
   };
 
   return (
@@ -100,7 +113,7 @@ export function TeamMemberForm({ onSubmit, initialData }) {
           <Input
             type="date"
             value={formData.start_date}
-            onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+            onChange={(e) => setFormData({ ...formData, start_date: e.target.value || null })}
           />
         </div>
       </div>
