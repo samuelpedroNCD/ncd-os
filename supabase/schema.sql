@@ -15,6 +15,11 @@ create table if not exists "public"."clients" (
   "company" text,
   "phone" text,
   "address" text,
+  "website" text,
+  "industry" text,
+  "notes" text,
+  "tax_id" text,
+  "payment_terms" integer default 30,
   "user_id" uuid references auth.users not null
 );
 
