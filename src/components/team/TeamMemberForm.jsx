@@ -13,7 +13,7 @@ export function TeamMemberForm({ onSubmit, initialData }) {
     avatar: initialData?.avatar || '',
     github: initialData?.github || '',
     linkedin: initialData?.linkedin || '',
-    start_date: initialData?.start_date || '',
+    start_date: initialData?.start_date || null,
     hourly_rate: initialData?.hourly_rate || '',
     bio: initialData?.bio || '',
     status: initialData?.status || 'Active',
@@ -27,19 +27,27 @@ export function TeamMemberForm({ onSubmit, initialData }) {
     const cleanedData = {
       ...formData,
       skills: formData.skills.split(',').map(skill => skill.trim()).filter(Boolean),
-      hourly_rate: parseFloat(formData.hourly_rate) || null,
-      // Only include start_date if it's not empty
-      ...(formData.start_date ? { start_date: formData.start_date } : {}),
-      // Clean up empty strings
-      ...(formData.phone ? { phone: formData.phone } : {}),
-      ...(formData.github ? { github: formData.github } : {}),
-      ...(formData.linkedin ? { linkedin: formData.linkedin } : {}),
-      ...(formData.avatar ? { avatar: formData.avatar } : {}),
-      ...(formData.bio ? { bio: formData.bio } : {}),
-      ...(formData.department ? { department: formData.department } : {})
+      hourly_rate: formData.hourly_rate ? parseFloat(formData.hourly_rate) : null,
+      // Only include non-null values
+      ...(formData.phone?.trim() ? { phone: formData.phone.trim() } : {}),
+      ...(formData.github?.trim() ? { github: formData.github.trim() } : {}),
+      ...(formData.linkedin?.trim() ? { linkedin: formData.linkedin.trim() } : {}),
+      ...(formData.avatar?.trim() ? { avatar: formData.avatar.trim() } : {}),
+      ...(formData.bio?.trim() ? { bio: formData.bio.trim() } : {}),
+      ...(formData.department?.trim() ? { department: formData.department.trim() } : {}),
+      // Handle start_date specifically - convert empty string to null
+      start_date: formData.start_date || null
     };
 
     onSubmit(cleanedData);
+  };
+
+  const handleDateChange = (e) => {
+    const value = e.target.value;
+    setFormData(prev => ({
+      ...prev,
+      start_date: value || null // Convert empty string to null
+    }));
   };
 
   return (
@@ -112,8 +120,8 @@ export function TeamMemberForm({ onSubmit, initialData }) {
           </label>
           <Input
             type="date"
-            value={formData.start_date}
-            onChange={(e) => setFormData({ ...formData, start_date: e.target.value || null })}
+            value={formData.start_date || ''}
+            onChange={handleDateChange}
           />
         </div>
       </div>
