@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import * as NavigationMenu from '@radix-ui/react-navigation-menu';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useAuthStore } from '../stores/authStore';
@@ -10,6 +10,7 @@ import { LogOut, Moon, Sun } from 'lucide-react';
 
 export function TopNav() {
   const navigate = useNavigate();
+  const location = useLocation();
   const logout = useAuthStore(state => state.logout);
   const { theme, toggleTheme } = useThemeStore();
   const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
@@ -20,64 +21,73 @@ export function TopNav() {
     navigate('/login');
   };
 
-  return (
-    <div className="fixed top-0 left-0 right-0 border-b border-zinc-800 bg-background/50 backdrop-blur-xl z-50">
-      <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-        <div className="flex items-center space-x-8">
-          <Link to="/" className="text-xl font-bold">
-            NCD-OS
-          </Link>
-          
-          <NavigationMenu.Root className="relative">
-            <NavigationMenu.List className="flex space-x-4">
-              <NavigationMenu.Item>
-                <Link to="/projects" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Projects
-                </Link>
-              </NavigationMenu.Item>
-              <NavigationMenu.Item>
-                <Link to="/tasks" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Tasks
-                </Link>
-              </NavigationMenu.Item>
-              <NavigationMenu.Item>
-                <Link to="/clients" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Clients
-                </Link>
-              </NavigationMenu.Item>
-              <NavigationMenu.Item>
-                <Link to="/team" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Team
-                </Link>
-              </NavigationMenu.Item>
-              <NavigationMenu.Item>
-                <Link to="/invoices" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Invoices
-                </Link>
-              </NavigationMenu.Item>
-            </NavigationMenu.List>
-          </NavigationMenu.Root>
-        </div>
+  const isActive = (path) => {
+    return location.pathname === path;
+  };
 
-        <div className="flex items-center space-x-4">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={toggleTheme} 
-            className="relative w-9 h-9"
-            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-          >
-            <Sun className={`h-[1.2rem] w-[1.2rem] transition-all ${
-              theme === 'dark' ? 'scale-0 opacity-0' : 'scale-100 opacity-100'
-            }`} />
-            <Moon className={`absolute h-[1.2rem] w-[1.2rem] transition-all ${
-              theme === 'dark' ? 'scale-100 opacity-100' : 'scale-0 opacity-0'
-            }`} />
-          </Button>
-          <Avatar />
-          <Button variant="ghost" size="icon" onClick={() => setIsLogoutDialogOpen(true)}>
-            <LogOut className="h-5 w-5" />
-          </Button>
+  const navItems = [
+    { path: '/', label: 'Dashboard' },
+    { path: '/projects', label: 'Projects' },
+    { path: '/tasks', label: 'Tasks' },
+    { path: '/clients', label: 'Clients' },
+    { path: '/team', label: 'Team' },
+    { path: '/invoices', label: 'Invoices' },
+  ];
+
+  return (
+    <div className="fixed top-4 left-0 right-0 z-50">
+      <div className="max-w-7xl mx-auto px-4">
+        <div className="bg-card/80 backdrop-blur-xl border border-border rounded-full shadow-lg">
+          <div className="h-14 flex items-center justify-between px-6">
+            <Link to="/" className="text-xl font-bold flex items-center space-x-2">
+              <span className="text-primary">NCD-OS</span>
+            </Link>
+            
+            <NavigationMenu.Root className="relative">
+              <NavigationMenu.List className="flex items-center space-x-1">
+                {navItems.map((item) => (
+                  <NavigationMenu.Item key={item.path}>
+                    <Link
+                      to={item.path}
+                      className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                        isActive(item.path)
+                          ? 'bg-primary text-primary-foreground'
+                          : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                      }`}
+                    >
+                      {item.label}
+                    </Link>
+                  </NavigationMenu.Item>
+                ))}
+              </NavigationMenu.List>
+            </NavigationMenu.Root>
+
+            <div className="flex items-center space-x-2">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={toggleTheme} 
+                className="relative w-9 h-9 rounded-full"
+                title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+              >
+                <Sun className={`h-[1.2rem] w-[1.2rem] transition-all ${
+                  theme === 'dark' ? 'scale-0 opacity-0' : 'scale-100 opacity-100'
+                }`} />
+                <Moon className={`absolute h-[1.2rem] w-[1.2rem] transition-all ${
+                  theme === 'dark' ? 'scale-100 opacity-100' : 'scale-0 opacity-0'
+                }`} />
+              </Button>
+              <Avatar className="h-8 w-8" />
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setIsLogoutDialogOpen(true)}
+                className="rounded-full"
+              >
+                <LogOut className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
 
