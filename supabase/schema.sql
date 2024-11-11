@@ -1,44 +1,93 @@
 -- Drop existing views first to avoid dependency issues
-drop view if exists public.project_analytics;
-drop view if exists public.task_analytics;
-drop view if exists public.revenue_analytics;
+drop view if exists "public"."project_analytics";
+drop view if exists "public"."task_analytics";
+drop view if exists "public"."revenue_analytics";
 
--- Add completion_percentage and completion_date columns if they don't exist
-do $$ 
-begin
-  -- Add completion_percentage to projects if it doesn't exist
-  if not exists (select 1 from information_schema.columns 
-    where table_schema = 'public' 
-    and table_name = 'projects' 
-    and column_name = 'completion_percentage') then
-    
-    alter table public.projects 
-    add column completion_percentage integer default 0;
-  end if;
+-- Create base tables if they don't exist
+create table if not exists "public"."clients" (
+  "id" uuid default gen_random_uuid() primary key,
+  "created_at" timestamp with time zone default timezone('utc'::text, now()) not null,
+  "name" text not null,
+  "email" text not null,
+  "company" text,
+  "phone" text,
+  "address" text,
+  "user_id" uuid references auth.users not null
+);
 
-  -- Add start_date to projects if it doesn't exist
-  if not exists (select 1 from information_schema.columns 
-    where table_schema = 'public' 
-    and table_name = 'projects' 
-    and column_name = 'start_date') then
-    
-    alter table public.projects 
-    add column start_date date not null default current_date;
-  end if;
+create table if not exists "public"."projects" (
+  "id" uuid default gen_random_uuid() primary key,
+  "created_at" timestamp with time zone default timezone('utc'::text, now()) not null,
+  "name" text not null,
+  "client_id" uuid references public.clients not null,
+  "budget" numeric(10,2),
+  "status" text not null,
+  "start_date" date default current_date not null,
+  "due_date" date,
+  "completion_percentage" integer default 0,
+  "user_id" uuid references auth.users not null
+);
 
-  -- Add completion_date to tasks if it doesn't exist
-  if not exists (select 1 from information_schema.columns 
-    where table_schema = 'public' 
-    and table_name = 'tasks' 
-    and column_name = 'completion_date') then
-    
-    alter table public.tasks 
-    add column completion_date timestamp with time zone;
-  end if;
-end $$;
+create table if not exists "public"."tasks" (
+  "id" uuid default gen_random_uuid() primary key,
+  "created_at" timestamp with time zone default timezone('utc'::text, now()) not null,
+  "title" text not null,
+  "description" text,
+  "project_id" uuid references public.projects not null,
+  "due_date" date,
+  "priority" text not null,
+  "completed" boolean default false,
+  "completion_date" timestamp with time zone,
+  "user_id" uuid references auth.users not null
+);
 
--- Now create the views
-create view public.project_analytics as
+create table if not exists "public"."team_members" (
+  "id" uuid default gen_random_uuid() primary key,
+  "created_at" timestamp with time zone default timezone('utc'::text, now()) not null,
+  "name" text not null,
+  "email" text not null,
+  "role" text not null,
+  "skills" text[],
+  "avatar" text,
+  "user_id" uuid references auth.users not null
+);
+
+create table if not exists "public"."invoices" (
+  "id" uuid default gen_random_uuid() primary key,
+  "created_at" timestamp with time zone default timezone('utc'::text, now()) not null,
+  "number" text not null,
+  "client_id" uuid references public.clients not null,
+  "amount" numeric(10,2) not null,
+  "status" text not null,
+  "due_date" date not null,
+  "user_id" uuid references auth.users not null
+);
+
+-- Enable RLS
+alter table if exists "public"."projects" enable row level security;
+alter table if exists "public"."tasks" enable row level security;
+alter table if exists "public"."clients" enable row level security;
+alter table if exists "public"."team_members" enable row level security;
+alter table if exists "public"."invoices" enable row level security;
+
+-- Create RLS policies
+create policy "Enable all actions for users based on user_id" on "public"."clients"
+  for all using (auth.uid() = user_id);
+
+create policy "Enable all actions for users based on user_id" on "public"."projects"
+  for all using (auth.uid() = user_id);
+
+create policy "Enable all actions for users based on user_id" on "public"."tasks"
+  for all using (auth.uid() = user_id);
+
+create policy "Enable all actions for users based on user_id" on "public"."team_members"
+  for all using (auth.uid() = user_id);
+
+create policy "Enable all actions for users based on user_id" on "public"."invoices"
+  for all using (auth.uid() = user_id);
+
+-- Create analytics views
+create or replace view public.project_analytics as
 select
   user_id,
   count(*) as total_projects,
@@ -49,7 +98,7 @@ select
 from public.projects
 group by user_id;
 
-create view public.task_analytics as
+create or replace view public.task_analytics as
 select
   user_id,
   count(*) as total_tasks,
@@ -61,7 +110,7 @@ select
 from public.tasks
 group by user_id;
 
-create view public.revenue_analytics as
+create or replace view public.revenue_analytics as
 select
   user_id,
   sum(amount) filter (where status = 'Paid') as total_revenue,
@@ -72,25 +121,22 @@ select
 from public.invoices
 group by user_id;
 
--- Enable RLS
-alter table if exists "public"."projects" enable row level security;
-alter table if exists "public"."tasks" enable row level security;
-alter table if exists "public"."clients" enable row level security;
-alter table if exists "public"."team_members" enable row level security;
-alter table if exists "public"."invoices" enable row level security;
-
--- Add RLS policies for analytics views
-create policy "Enable read access for authenticated users" on public.project_analytics
+-- Create RLS policies for views
+create policy "Enable read access for users based on user_id" on public.project_analytics
   for select using (auth.uid() = user_id);
 
-create policy "Enable read access for authenticated users" on public.task_analytics
+create policy "Enable read access for users based on user_id" on public.task_analytics
   for select using (auth.uid() = user_id);
 
-create policy "Enable read access for authenticated users" on public.revenue_analytics
+create policy "Enable read access for users based on user_id" on public.revenue_analytics
   for select using (auth.uid() = user_id);
 
--- Add indexes for analytics performance
+-- Add indexes for better performance
+create index if not exists idx_projects_user_id on public.projects(user_id);
+create index if not exists idx_tasks_user_id on public.tasks(user_id);
+create index if not exists idx_clients_user_id on public.clients(user_id);
+create index if not exists idx_team_members_user_id on public.team_members(user_id);
+create index if not exists idx_invoices_user_id on public.invoices(user_id);
 create index if not exists idx_projects_status on public.projects(status);
 create index if not exists idx_tasks_completion on public.tasks(completed, due_date);
 create index if not exists idx_invoices_status on public.invoices(status);
-create index if not exists idx_projects_dates on public.projects(start_date, due_date);
