@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 
@@ -13,7 +13,7 @@ export function TeamMemberForm({ onSubmit, initialData }) {
     avatar: initialData?.avatar || '',
     github: initialData?.github || '',
     linkedin: initialData?.linkedin || '',
-    start_date: initialData?.start_date || null,
+    start_date: initialData?.start_date ? new Date(initialData.start_date).toISOString().split('T')[0] : '',
     hourly_rate: initialData?.hourly_rate || '',
     bio: initialData?.bio || '',
     status: initialData?.status || 'Active',
@@ -28,15 +28,15 @@ export function TeamMemberForm({ onSubmit, initialData }) {
       ...formData,
       skills: formData.skills.split(',').map(skill => skill.trim()).filter(Boolean),
       hourly_rate: formData.hourly_rate ? parseFloat(formData.hourly_rate) : null,
-      // Only include non-null values
+      // Only include non-empty values
       ...(formData.phone?.trim() ? { phone: formData.phone.trim() } : {}),
       ...(formData.github?.trim() ? { github: formData.github.trim() } : {}),
       ...(formData.linkedin?.trim() ? { linkedin: formData.linkedin.trim() } : {}),
       ...(formData.avatar?.trim() ? { avatar: formData.avatar.trim() } : {}),
       ...(formData.bio?.trim() ? { bio: formData.bio.trim() } : {}),
       ...(formData.department?.trim() ? { department: formData.department.trim() } : {}),
-      // Handle start_date specifically - convert empty string to null
-      start_date: formData.start_date || null
+      // Handle start_date - if empty string or invalid, set to null
+      start_date: formData.start_date ? formData.start_date : null
     };
 
     onSubmit(cleanedData);
@@ -46,7 +46,7 @@ export function TeamMemberForm({ onSubmit, initialData }) {
     const value = e.target.value;
     setFormData(prev => ({
       ...prev,
-      start_date: value || null // Convert empty string to null
+      start_date: value || null
     }));
   };
 
